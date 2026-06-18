@@ -11,7 +11,14 @@
 <button {onclick}>{label}</button>
 
 <style>
+button {
+  transition: color 0.3s ease;
+  max-width: 960px;
+  margin: 40px auto;
+  display: flex;
+}
+
 button:hover {
-  background-color: black;
+  color: springgreen;
 }
 </style>
