@@ -1,13 +1,15 @@
 <main>
-    <p> File Format Converter </p>
+    <p1> File Format Converter </p1>
+    <p>Free and Accessible tool for file conversion!</p>
 </main> 
 
 <style>
     main {
         background-color: aliceblue;
         padding: 20px;
-    }
-    p {
+         }
+
+    p1 {
          display: flex;
          justify-content: center; /* Centers items horizontally */
          align-items: center;     /* Centers items vertically */
@@ -19,5 +21,12 @@
          letter-spacing: -0.025em;
          line-height: 1.2;
          text-wrap: balance; /* Distributes words evenly across lines automatically */
+        }
+
+    p   {
+         display: flex;
+         justify-content: center; /* Centers items horizontally */
+         font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         color: #111827;
         }
 </style>
