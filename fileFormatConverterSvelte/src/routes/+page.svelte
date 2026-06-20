@@ -10,8 +10,6 @@ import Footer from '$lib/components/Footer.svelte';
 
 <Interaction />
 
-<Button label="Rafael"> </Button>
-
 <Purpose />
 
 <Footer />

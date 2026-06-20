@@ -12,18 +12,18 @@
 <style>
 
     main {
-        padding: 40px;
+        padding: 20px;
         display: flex;
         flex-direction: column;
         align-items: center;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         background-color: aliceblue;
-        max-width: 800px;
+        max-width: 600px;
         margin-left: auto ;
         margin-right: auto;
         border-radius: 15px;
-        color: #111827;
-
+        color: #000000;
+        border: 2px solid #000000;
          }
     .purpose-decoration {
         display: flex;
