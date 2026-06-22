@@ -1,14 +1,10 @@
 <script lang="ts">
-    // Import Icons
+    import dropdownArrow from '$lib/assets/dropdownArrow.png';
     import googleDrive from '$lib/assets/googleDriveIcon.png';
     import oneDrive from '$lib/assets/oneDriveIcon.png';
     import dropboxIcon from '$lib/assets/dropboxIcon.svg';
     import urlIcon from '$lib/assets/urlIcon.png';
     import fileUpload from '$lib/assets/fileUpload.svg';
-    import dropDown from '$lib/assets/dropdown.svg';
-
-    // Import Sounds
-    import clickSound from "$lib/assets/dropdownClick.mp3";
 
     interface DropdownItem {
         id: number;
@@ -17,6 +13,7 @@
     }
 
     const items: DropdownItem[] = [
+    { id: 1, name: 'Upload Options:', img: null},
     { id: 2, name: 'Upload From Device', img: fileUpload},
     { id: 3, name: 'Google Drive', img: googleDrive },
     { id: 4, name: 'One Drive', img: oneDrive },
@@ -26,62 +23,15 @@
 
     // Track state
   let isOpen = $state(false);
-  let selectedItem: DropdownItem = $state({ id: 1, name: 'Select Upload Option', img: dropDown });
-
-    // Track selected files for device upload
- let selectedFiles: FileList | null = $state(null);
- let fileInput: HTMLInputElement;
+  let selectedItem: DropdownItem = $state(items[0]);
 
   function toggleDropdown() {
-        playSound();
     isOpen = !isOpen;
   }
-
-  function playSound() {
-    const audio = new Audio(clickSound);
-    audio.volume = 0.5;
-    audio.play();
-}
-
- function handleFileChange(event: Event) {
-    const target = event.target as HTMLInputElement;
-    selectedFiles = target.files;
-
-    if (selectedFiles && selectedFiles[0]) {
-        console.log(`Selected file: ${selectedFiles[0].name}`);
-    
-        // Extract file info
-        const fileName = selectedFiles[0].name;
-        const fileSize = selectedFiles[0].size;
-        const fileType = selectedFiles[0].type;
-
-        // Send to backend HERE
-        const formData = new FormData();
-        formData.append('file', selectedFiles[0]);
-        fetch('/api/convert', { method: 'POST', body: formData });
-    }
-}
 
   function selectItem(item: DropdownItem) {
     selectedItem = item;
     isOpen = false;
-
-    switch (item.id) {
-        case 2: 
-        // Handles file upload from device
-        fileInput?.click();
-        break;
-        case 3: 
-        // Handles Google Drive upload
-        case 4:
-        // Handles One Drive Upload
-        case 5:
-        // Handles Drop Box Upload
-        case 6: 
-        // Handles URL Upload
-        default:
-        alert(`Selected: ${item.name} Implementation not ready.`); 
-    }
   }
 </script>
 
@@ -94,7 +44,7 @@
       <img src={selectedItem.img} alt={selectedItem.name} class="icon" />
     {/if}
     <span>{selectedItem.name}</span>
-    <span class="arrow">{isOpen ? '^' : 'v'}</span>
+    <span class="arrow">{isOpen ? '▲' : '▼'}</span>
   </button>
 
   <!-- Dropdown Menu -->
@@ -114,24 +64,6 @@
   {/if}
 </div>
 
-<!-- Hidden File Input for Device Upload -->
-<input
-    type="file"
-    bind:this={fileInput}
-    accept="image/png, image/jpeg"
-    onchange={handleFileChange}
-    style="display: none;"
-/>
-
-<!-- Dropdown Content -->
-{#if selectedItem.id !== 1}
-    <div class="dropdown-content">
-        <!-- Additional content based on selection can go here -->
-         {#if selectedItem.id === 2 && selectedFiles}
-            <p>Files selected: {selectedFiles.length}</p>
-        {/if}
-    </div>
-{/if}
 </main>
 
 <style>
@@ -140,11 +72,6 @@
         margin: 40px auto;
         display: flex;
         justify-content: center;
-        background-color: #ffffff;
-        padding: 20px;
-        border-radius: 5px;
-        max-width: 600px;
-        border:#000000 solid 5px;
     }
 
     .dropdown-container {
