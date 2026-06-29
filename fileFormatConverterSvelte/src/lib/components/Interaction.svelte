@@ -1,111 +1,224 @@
 <script lang="ts">
-    // Import Icons
-    import optionIcon from '$lib/assets/OptionIcon.svg';
-    import googleDrive from '$lib/assets/googleDriveIcon.png';
-    import oneDrive from '$lib/assets/oneDriveIcon.png';
-    import dropboxIcon from '$lib/assets/dropboxIcon.svg';
-    import urlIcon from '$lib/assets/urlIcon.png';
-    import fileUpload from '$lib/assets/fileUpload.svg';
 
-    // Import Sounds
-    import clickSound from '$lib/assets/dropdownClick.mp3';
+/// <reference types="@types/google.picker" />
 
-    interface DropdownItem {
-        id: string | number;
-        name: string;
-        img: string | null;
-    }
+  import { onMount } from 'svelte';
 
-    const items: DropdownItem[] = [
-    { id: "DeviceUpload", name: 'Upload From Device', img: fileUpload},
-    { id: "GoogleDrive", name: 'Google Drive', img: googleDrive },
-    { id: "OneDrive", name: 'One Drive', img: oneDrive },
-    { id: "Dropbox", name: 'Drop Box', img: dropboxIcon },
-    { id: "URL", name: 'URL', img: urlIcon }
+  import optionIcon from '$lib/assets/OptionIcon.svg';
+  import googleDrive from '$lib/assets/googleDriveIcon.png';
+  import oneDrive from '$lib/assets/oneDriveIcon.png';
+  import dropboxIcon from '$lib/assets/dropboxIcon.svg';
+  import urlIcon from '$lib/assets/urlIcon.png';
+  import fileUpload from '$lib/assets/fileUpload.svg';
+
+  interface DropdownItem {
+    id: string | number;
+    name: string;
+    img: string | null;
+  }
+
+  const items: DropdownItem[] = [
+    { id: 'DeviceUpload', name: 'Upload From Device', img: fileUpload },
+    { id: 'GoogleDrive', name: 'Google Drive', img: googleDrive },
+    { id: 'OneDrive', name: 'One Drive', img: oneDrive },
+    { id: 'Dropbox', name: 'Drop Box', img: dropboxIcon },
+    { id: 'URL', name: 'URL', img: urlIcon }
   ];
 
-  const conversionTargets = ['JPG','PNG', 'PDF', 'DOCX']
+  const conversionTargets = ['JPG', 'PNG', 'PDF', 'DOCX', 'TXT'];
 
-    // Track state
   let isOpen = $state(false);
   let mode = $state('UploadOptions');
-  let selectedItem: DropdownItem = $state({ id: "UploadOptions", name: 'Upload Options:', img: optionIcon});
-  let selectedFile: File | null = $state(null);
-  let hiddenFileInput: HTMLInputElement | null = $state(null);
+  let selectedItem = $state<DropdownItem>({ id: 'UploadOptions', name: 'Upload Options:', img: optionIcon });
+  let selectedFile = $state<File | null>(null);
+  let hiddenFileInput = $state<HTMLInputElement | null>(null);
   let selectedConversion = $state(conversionTargets[0]);
 
+  let clientID = '913788147767-b48d86r2anhp6tofuvfuluad81n38kho.apps.googleusercontent.com';
+  let apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+  let accessToken = $state('');
+  let tokenClient: any = $state(null);
+  let pickerApiLoaded = $state(false);
+
+  function initGoogleTokenClient() {
+    if (!window.google?.accounts?.oauth2?.initTokenClient) return;
+
+    tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientID,
+      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      callback: (res: any) => {
+        if (res.error || !res.access_token) {
+          console.error('Authentication failed or cancelled:', res.error);
+          return;
+        }
+
+        const hasScope = window.google.accounts.oauth2.hasGrantedAllScopes(
+          res,
+          'https://www.googleapis.com/auth/drive.readonly'
+        );
+
+        if (!hasScope) {
+          console.warn('User did not grant Drive permissions.');
+          return;
+        }
+
+        accessToken = res.access_token;
+        openDrivePicker(); // open picker immediately after auth
+      }
+    });
+  }
+
+  function loadGoogleScript() {
+    if (window.google?.accounts?.oauth2?.initTokenClient) {
+      initGoogleTokenClient();
+    } else {
+      const gsi = document.createElement('script');
+      gsi.src = 'https://accounts.google.com/gsi/client';
+      gsi.async = true;
+      gsi.defer = true;
+      gsi.onload = initGoogleTokenClient;
+      document.head.appendChild(gsi);
+    }
+
+    // Load the Picker API
+    const gapiScript = document.createElement('script');
+    gapiScript.src = 'https://apis.google.com/js/api.js';
+    gapiScript.onload = () => {
+      gapi.load('picker', () => {
+        pickerApiLoaded = true;
+      });
+    };
+    document.head.appendChild(gapiScript);
+  }
+
+  onMount(() => {
+    loadGoogleScript();
+  });
+
+  function openDrivePicker() {
+    if (!pickerApiLoaded) return alert('Google Picker is not ready yet.');
+
+    const picker = new google.picker.PickerBuilder()
+      .addView(google.picker.ViewId.DOCS)
+      .setOAuthToken(accessToken)
+      .setDeveloperKey(apiKey)
+      .setCallback((data: any) => {
+        if (data.action !== google.picker.Action.PICKED) return;
+        const fileId = data.docs[0].id;
+        fetchGoogleDriveFile(fileId);
+      })
+      .build();
+
+    picker.setVisible(true);
+  }
+
   function toggleDropdown() {
-    playSound();
     isOpen = !isOpen;
   }
 
-  function playSound() {
-    const audio = new Audio(clickSound);
-    audio.play();
-  }
-
-  function selectItem(item: DropdownItem) {
+  function selectUploadSource(item: DropdownItem) {
     isOpen = false;
-        switch(item.id) {
-            case "DeviceUpload":
-                // open the hidden file input
-                setTimeout(() => hiddenFileInput?.click(), 0);
-                break;
-            case "GoogleDrive":
-            case "OneDrive":
-            case "Dropbox":
-            case "URL":
-            default:
-                alert(`${item.id} is not implemented yet.`);
-        }
     selectedItem = item;
+
+    if (item.id === 'DeviceUpload') {
+      hiddenFileInput?.click();
+      return;
+    }
+
+    if (item.id === 'GoogleDrive') {
+      if (!tokenClient) return alert('Google auth is not ready yet.');
+
+      if (!accessToken) {
+        tokenClient.requestAccessToken(); // triggers OAuth popup; callback calls openDrivePicker
+        return;
+      }
+
+      openDrivePicker(); // already authed, open picker directly
+      return;
+    }
+
+    alert(`${item.id} is not implemented yet.`);
   }
 
-    // Placeholder functions for file handling
-    function handleFileSelected(event: Event) {
-        const input = event.target as HTMLInputElement;
-        const file = input.files?.[0] ?? null;
+  async function fetchGoogleDriveFile(fileId: string) {
+    const headers = { Authorization: `Bearer ${accessToken}` };
 
-        selectedFile = file;
-        if (file) {
-            selectedItem = { id: "DeviceUpload", name: file.name, img: fileUpload };
-            mode = 'DeviceUpload';
-        }
+    const metaRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,mimeType,size`,
+      { headers }
+    );
+
+    if (!metaRes.ok) throw new Error('Failed to fetch file metadata');
+    const metadata = await metaRes.json();
+
+    const isGoogleWorkspace = metadata.mimeType?.startsWith('application/vnd.google-apps');
+
+    const EXPORT_MIME_MAP: Record<string, { mime: string; ext: string }> = {
+      'application/vnd.google-apps.document':     { mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', ext: 'docx' },
+      'application/vnd.google-apps.spreadsheet':  { mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',       ext: 'xlsx' },
+      'application/vnd.google-apps.presentation': { mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', ext: 'pptx' },
+      'application/vnd.google-apps.drawing':      { mime: 'image/svg+xml', ext: 'svg' },
+    };
+
+    let downloadUrl: string;
+    let finalMime: string;
+    let finalName: string = metadata.name || `drive-file-${fileId}`;
+
+    if (isGoogleWorkspace) {
+      const exportTarget = EXPORT_MIME_MAP[metadata.mimeType];
+      if (!exportTarget) throw new Error(`Unsupported Google Workspace type: ${metadata.mimeType}`);
+
+      downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=${encodeURIComponent(exportTarget.mime)}`;
+      finalMime = exportTarget.mime;
+      finalName = `${finalName}.${exportTarget.ext}`;
+    } else {
+      downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+      finalMime = metadata.mimeType || 'application/octet-stream';
     }
 
-    // Placeholder functions for file handling
-     function removeSelectedFile() {
-        selectedFile = null;
-        selectedItem = { id: "UploadOptions", name: 'Upload Options:', img: optionIcon };
-        mode = 'UploadOptions';
+    const fileRes = await fetch(downloadUrl, { headers });
+    if (!fileRes.ok) throw new Error(`Failed to download file: ${fileRes.status} ${fileRes.statusText}`);
 
-        if (hiddenFileInput) {
-            hiddenFileInput.value = '';
-        }
+    const blob = await fileRes.blob();
+    const file = new File([blob], finalName, { type: finalMime });
+
+    selectedFile = file;
+    selectedItem = { id: 'GoogleDrive', name: file.name, img: googleDrive };
+    mode = 'DeviceUpload';
+  }
+
+  function handleFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    selectedFile = file;
+
+    if (file) {
+      selectedItem = { id: 'DeviceUpload', name: file.name, img: fileUpload };
+      mode = 'DeviceUpload';
     }
+  }
 
-    // Placeholder functions for file handling
-    function uploadFile() {
-        if (!selectedFile) return;
+  function removeSelectedFile() {
+    selectedFile = null;
+    selectedItem = { id: 'UploadOptions', name: 'Upload Options:', img: optionIcon };
+    mode = 'UploadOptions';
+    if (hiddenFileInput) hiddenFileInput.value = '';
+  }
 
-        // stub: replace with actual upload/conversion logic later
-        console.log('Uploading file:', selectedFile.name, selectedFile);
+  async function uploadFile() {
+    if (!selectedFile) return;
+  }
+
+  function formatBytes(bytes: number) {
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let value = bytes;
+    let index = 0;
+    while (value >= 1024 && index < units.length - 1) {
+      value /= 1024;
+      index++;
     }
-
-    // Placeholder function for formatting bytes
-    function formatBytes(bytes: number) {
-        const units = ['B', 'KB', 'MB', 'GB'];
-        let value = bytes;
-        let index = 0;
-
-        while (value >= 1024 && index < units.length - 1) {
-            value /= 1024;
-            index += 1;
-        }
-
-        return `${value.toFixed(1)} ${units[index]}`;
-    }
-
+    return `${value.toFixed(1)} ${units[index]}`;
+  }
 </script>
 
 <main>
@@ -127,10 +240,11 @@
                         </select>
                     </label>
 
-                <button class="remove-button" on:click={removeSelectedFile}>Remove</button>
+                    <button class="remove-button" onclick={removeSelectedFile}>Remove</button>
                 </div>
             </div>
-            <button class="upload-button" on:click={uploadFile}>Upload</button>
+
+            <button class="upload-button" onclick={uploadFile}>Upload</button>
         {:else}
             <div class="empty-state">
                 <p>Select "Upload From Device" and choose a file to start.</p>
@@ -138,15 +252,15 @@
         {/if}
     </div>
 
-  <input
+    <input
         type="file"
         bind:this={hiddenFileInput}
         hidden
-        on:change={handleFileSelected}
+        onchange={handleFileSelected}
     />
 
     <div class="dropdown-container">
-        <button class="dropdown-trigger" on:click={toggleDropdown}>
+        <button class="dropdown-trigger" onclick={toggleDropdown}>
             {#if selectedItem.img}
                 <img src={selectedItem.img} alt={selectedItem.name} class="icon" />
             {/if}
@@ -158,7 +272,7 @@
             <ul class="dropdown-menu">
                 {#each items as item}
                     <li>
-                        <button class="dropdown-item" on:click={() => selectItem(item)}>
+                        <button class="dropdown-item" onclick={() => selectUploadSource(item)}>
                             {#if item.img}
                                 <img src={item.img} alt={item.name} class="icon" />
                             {/if}

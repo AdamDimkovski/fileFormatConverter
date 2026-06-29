@@ -6,7 +6,16 @@
 	let { children } = $props();
 </script>
 
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
+<svelte:head>
+
+<!-- Favicon -->
+<link rel="icon" href={favicon} />
+
+<!-- Google Analytics -->
+<script src="https://google.com" async defer>
+
+</script>
+</svelte:head>
 
 <Background />
 {@render children()}

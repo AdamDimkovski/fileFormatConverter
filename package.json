@@ -1,0 +1,6 @@
+{
+  "devDependencies": {
+    "@types/gapi": "^0.0.47",
+    "@types/google.picker": "^0.0.52"
+  }
+}
